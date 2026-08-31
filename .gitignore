@@ -1,0 +1,31 @@
+# Python cache files
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Build files
+build/
+dist/
+*.egg-info/
+
+# PyInstaller
+*.manifest
+
+# Buildozer / Android
+.buildozer/
+bin/
+
+# Local preferences created by GradeAssist
+grade_calculator_preferences.json
+
+# IDE/editor files
+.vscode/
+.idea/
+
+# Operating system files
+.DS_Store
+Thumbs.db
