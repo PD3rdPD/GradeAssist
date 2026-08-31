@@ -1,0 +1,24 @@
+GradeAssist Beta — Teacher Feedback
+
+Thank you for trying GradeAssist.
+
+This is an early teacher-feedback build. Please focus on how useful, clear,
+and easy the program feels rather than visual perfection.
+
+1. What did you like most?
+
+2. What was confusing or difficult to use?
+
+3. Which feature would be most useful to you or your students?
+
+4. Is there anything you expected the program to do that it does not do yet?
+
+5. Were any labels, instructions, or results unclear?
+
+6. Did anything appear broken or behave unexpectedly?
+
+7. Would you realistically use or recommend a tool like this?
+
+8. Anything else you would change?
+
+Build: GradeAssist 0.9 Beta — Teacher Feedback Build
