@@ -22,6 +22,7 @@ from kivy.utils import platform
 from calculator_logic import (
     calculate_average,
     calculate_required_grade,
+    calculate_weighted_average,
     generate_grade_paths,
     letter_grade,
     parse_grades,
@@ -1144,6 +1145,7 @@ class GradeCalculatorAndroid(BoxLayout):
         self.build_header()
         self.build_student_card()
         self.build_current_card()
+        self.build_weighted_card()
         self.build_goal_card()
         self.build_path_card()
         self.build_about_card()
@@ -1351,6 +1353,101 @@ class GradeCalculatorAndroid(BoxLayout):
         self.add_widget(
             self.current_card
         )
+
+    def build_weighted_card(self):
+    """Build the weighted grade categories section."""
+
+    self.weighted_card = Card()
+
+    self.weighted_heading = Label(
+        text="Weighted Grade Categories",
+        bold=True,
+        font_size="19sp",
+        size_hint_y=None,
+        height=dp(38),
+    )
+
+    self.weighted_instructions = Label(
+        text=(
+            "Enter grades for each category separated by commas "
+            "and assign each category a percentage weight."
+        ),
+        size_hint_y=None,
+        height=dp(65),
+        halign="center",
+        valign="middle",
+    )
+
+    self.weighted_instructions.bind(
+        width=lambda widget, width: setattr(
+            widget,
+            "text_size",
+            (width - dp(20), None),
+        )
+    )
+
+    self.tests_grades = self.create_input()
+    self.tests_grades.hint_text = "Tests grades: 85, 92, 78"
+
+    self.tests_weight = self.create_input(
+        input_filter="float"
+    )
+    self.tests_weight.hint_text = "Tests weight %"
+
+    self.quizzes_grades = self.create_input()
+    self.quizzes_grades.hint_text = "Quizzes grades: 90, 88"
+
+    self.quizzes_weight = self.create_input(
+        input_filter="float"
+    )
+    self.quizzes_weight.hint_text = "Quizzes weight %"
+
+    self.homework_grades = self.create_input()
+    self.homework_grades.hint_text = "Homework grades: 100, 95, 92"
+
+    self.homework_weight = self.create_input(
+        input_filter="float"
+    )
+    self.homework_weight.hint_text = "Homework weight %"
+
+    self.weighted_button = RoundedButton(
+        text="Calculate Weighted Grade"
+    )
+
+    self.weighted_button.bind(
+        on_press=self.calculate_weighted_grade
+    )
+
+    self.weighted_result = Label(
+        size_hint_y=None,
+        height=dp(90),
+        halign="center",
+        valign="middle",
+    )
+
+    self.weighted_result.bind(
+        width=lambda widget, width: setattr(
+            widget,
+            "text_size",
+            (width - dp(20), None),
+        )
+    )
+
+    for widget in [
+        self.weighted_heading,
+        self.weighted_instructions,
+        self.tests_grades,
+        self.tests_weight,
+        self.quizzes_grades,
+        self.quizzes_weight,
+        self.homework_grades,
+        self.homework_weight,
+        self.weighted_button,
+        self.weighted_result,
+    ]:
+        self.weighted_card.add_widget(widget)
+
+    self.add_widget(self.weighted_card)
 
 
     def build_goal_card(self):
@@ -1744,6 +1841,7 @@ class GradeCalculatorAndroid(BoxLayout):
             self.header_card,
             self.student_card,
             self.current_card,
+            self.weighted_card,
             self.goal_card,
             self.path_card,
             self.about_card,
@@ -1757,10 +1855,12 @@ class GradeCalculatorAndroid(BoxLayout):
             self.title_label,
             self.student_heading,
             self.current_heading,
+            self.weighted_heading,
             self.goal_heading,
             self.path_heading,
             self.about_heading,
             self.result_label,
+            self.weighted_result,
         ]:
 
             label.color = (
@@ -1774,6 +1874,7 @@ class GradeCalculatorAndroid(BoxLayout):
             self.grades_label,
             self.extra_points_label,
             self.feedback_label,
+            self.weighted_instructions,
             self.target_label,
             self.remaining_label,
             self.goal_label,
@@ -1788,6 +1889,12 @@ class GradeCalculatorAndroid(BoxLayout):
         for field in [
             self.name_input,
             self.grades_input,
+            self.tests_grades,
+            self.tests_weight,
+            self.quizzes_grades,
+            self.quizzes_weight,
+            self.homework_grades,
+            self.homework_weight,
             self.target_input,
             self.remaining_input,
         ]:
@@ -1810,6 +1917,7 @@ class GradeCalculatorAndroid(BoxLayout):
 
         for button in [
             self.calculate_button,
+            self.weighted_button,
             self.goal_button,
             self.path_button,
         ]:
@@ -2152,6 +2260,80 @@ class GradeCalculatorAndroid(BoxLayout):
 
 
     # =====================================================
+    # CALCULATE WEIGHTED GRADE
+    # =====================================================
+
+    def calculate_weighted_grade(self, instance):
+        """Calculate the course average using weighted categories."""
+
+        try:
+            categories = []
+
+            category_inputs = [
+                (self.tests_grades, self.tests_weight),
+                (self.quizzes_grades, self.quizzes_weight),
+                (self.homework_grades, self.homework_weight),
+            ]
+
+            for grades_input, weight_input in category_inputs:
+                grades_text = grades_input.text.strip()
+                weight_text = weight_input.text.strip()
+
+                # Ignore a category if both fields are blank.
+                if not grades_text and not weight_text:
+                    continue
+
+                # Require both grades and weight when a category is used.
+                if not grades_text or not weight_text:
+                    raise ValueError(
+                        "Enter both grades and a weight for each category."
+                    )
+
+                grades = parse_grades(
+                    grades_text,
+                    allow_over_100=self.allow_over_100.selected,
+                )
+
+                weight = float(weight_text)
+
+                if weight < 0:
+                    raise ValueError(
+                        "Category weights cannot be negative."
+                    )
+
+                categories.append(
+                    (grades, weight)
+                )
+
+            average = calculate_weighted_average(
+                categories
+            )
+
+        except ValueError as error:
+            self.show_message(str(error))
+            return
+
+        self.current_grades = []
+
+        self.weighted_result.text = (
+            f"Weighted Average: {average:.2f}%\n"
+            f"Letter Grade: {letter_grade(average)}"
+        )
+
+        self.result_label.text = (
+            f"Weighted Average: {average:.2f}%\n"
+            f"Letter Grade: {letter_grade(average)}"
+        )
+
+        self.feedback_label.text = (
+            translated_feedback(
+                average,
+                self.lang(),
+            )
+        )
+    
+
+    # =====================================================
     # GRADE GOAL
     # =====================================================
 
@@ -2406,6 +2588,17 @@ class GradeCalculatorAndroid(BoxLayout):
         self.remaining_input.text = ""
 
         self.extra_credit_input.text = "0"
+
+        self.tests_grades.text = ""
+        self.tests_weight.text = ""
+
+        self.quizzes_grades.text = ""
+        self.quizzes_weight.text = ""
+
+        self.homework_grades.text = ""
+        self.homework_weight.text = ""
+
+        self.weighted_result.text = ""
 
         self.allow_over_100.set_selected(
             False
