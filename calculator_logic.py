@@ -16,6 +16,43 @@ def calculate_average(
 
     return (sum(grades) + extra_credit_points) / len(grades)
 
+def calculate_weighted_average(
+    categories: list[tuple[list[float], float]],
+) -> float:
+    """Calculate an overall average using weighted grade categories."""
+
+    if not categories:
+        raise ValueError("At least one grade category is required.")
+
+    total_weight = 0.0
+    weighted_total = 0.0
+
+    for grades, weight in categories:
+        if not grades:
+            raise ValueError(
+                "Each category must contain at least one grade."
+            )
+
+        if weight < 0:
+            raise ValueError(
+                "Category weights cannot be negative."
+            )
+
+        category_average = sum(grades) / len(grades)
+
+        weighted_total += (
+            category_average * (weight / 100)
+        )
+
+        total_weight += weight
+
+    if abs(total_weight - 100) > 0.01:
+        raise ValueError(
+            "Category weights must total 100%."
+        )
+
+    return weighted_total
+
 
 def letter_grade(average: float) -> str:
     """Convert a numerical average into a letter grade."""
