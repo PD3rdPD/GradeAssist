@@ -859,27 +859,27 @@ def system_uses_dark_mode() -> bool:
     if platform != "android":
         return False
 
-    try:
-        from jnius import autoclass
+        try:
+            from jnius import autoclass
 
-        PythonActivity = autoclass(
-            "org.kivy.android.PythonActivity"
-        )
+            PythonActivity = autoclass(
+                "org.kivy.android.PythonActivity"
+            )
 
-        activity = PythonActivity.mActivity
+            activity = PythonActivity.mActivity
 
-        configuration = (
-            activity
-            .getResources()
-            .getConfiguration()
-        )
+            configuration = (
+                activity
+                .getResources()
+                .getConfiguration()
+            )
 
-        return (
-            configuration.uiMode & 0x30
-        ) == 0x20
+            return (
+                configuration.uiMode & 0x30
+            ) == 0x20
 
-    except Exception:
-        return False
+        except Exception:
+            return False
 
 
 # =========================================================
@@ -1145,7 +1145,6 @@ class GradeCalculatorAndroid(BoxLayout):
         self.build_header()
         self.build_student_card()
         self.build_current_card()
-        self.build_weighted_card()
         self.build_goal_card()
         self.build_path_card()
         self.build_about_card()
@@ -1229,7 +1228,9 @@ class GradeCalculatorAndroid(BoxLayout):
         )
 
 
+
     def build_student_card(self):
+        """Build one grade-entry area for Standard or Weighted grading."""
 
         self.student_card = Card()
 
@@ -1247,6 +1248,24 @@ class GradeCalculatorAndroid(BoxLayout):
 
         self.name_input = self.create_input()
 
+        self.grading_mode_label = Label(
+            text="How is this course graded?",
+            size_hint_y=None,
+            height=dp(26),
+        )
+
+        self.grading_mode_spinner = Spinner(
+            text="Standard",
+            values=("Standard", "Weighted"),
+            size_hint_y=None,
+            height=dp(50),
+        )
+
+        self.grading_mode_spinner.bind(
+            text=self.update_grading_mode
+        )
+
+        # Standard grade-entry controls.
         self.grades_label = Label(
             size_hint_y=None,
             height=dp(26),
@@ -1254,54 +1273,186 @@ class GradeCalculatorAndroid(BoxLayout):
 
         self.grades_input = self.create_input()
 
-        self.allow_over_100 = (
-            SelectableButton()
-        )
-
-        self.use_extra_credit = (
-            SelectableButton()
-        )
+        self.allow_over_100 = SelectableButton()
+        self.use_extra_credit = SelectableButton()
 
         self.extra_points_label = Label(
             size_hint_y=None,
             height=dp(26),
         )
 
-        self.extra_credit_input = (
-            self.create_input(
-                text="0",
-                input_filter="float",
+        self.extra_credit_input = self.create_input(
+            text="0",
+            input_filter="float",
+        )
+
+        # Weighted grade-entry controls.
+        self.weighted_instructions = Label(
+            text=(
+                "Enter grades for each category, then enter "
+                "the percentage that category is worth."
+            ),
+            size_hint_y=None,
+            height=dp(65),
+            halign="center",
+            valign="middle",
+        )
+        self.weighted_instructions.bind(
+            width=lambda widget, width: setattr(
+                widget,
+                "text_size",
+                (width - dp(20), None),
             )
         )
 
-        self.calculate_button = (
-            RoundedButton()
+        self.tests_label = Label(
+            text="Tests",
+            bold=True,
+            size_hint_y=None,
+            height=dp(26),
         )
+        self.tests_grades = self.create_input()
+        self.tests_grades.hint_text = "Grades: 85, 92, 78"
+        self.tests_weight_label = Label(
+            text="Tests Weight (%)",
+            size_hint_y=None,
+            height=dp(26),
+        )
+        self.tests_weight = self.create_input(
+            input_filter="float"
+        )
+        self.tests_weight.hint_text = "Example: 40"
 
+        self.quizzes_label = Label(
+            text="Quizzes",
+            bold=True,
+            size_hint_y=None,
+            height=dp(26),
+        )
+        self.quizzes_grades = self.create_input()
+        self.quizzes_grades.hint_text = "Grades: 90, 88"
+        self.quizzes_weight_label = Label(
+            text="Quizzes Weight (%)",
+            size_hint_y=None,
+            height=dp(26),
+        )
+        self.quizzes_weight = self.create_input(
+            input_filter="float"
+        )
+        self.quizzes_weight.hint_text = "Example: 25"
+
+        self.homework_label = Label(
+            text="Homework",
+            bold=True,
+            size_hint_y=None,
+            height=dp(26),
+        )
+        self.homework_grades = self.create_input()
+        self.homework_grades.hint_text = "Grades: 100, 95, 92"
+        self.homework_weight_label = Label(
+            text="Homework Weight (%)",
+            size_hint_y=None,
+            height=dp(26),
+        )
+        self.homework_weight = self.create_input(
+            input_filter="float"
+        )
+        self.homework_weight.hint_text = "Example: 35"
+
+        self.calculate_button = RoundedButton()
         self.calculate_button.bind(
             on_press=self.calculate_grade
         )
 
-        for widget in [
-            self.student_heading,
-            self.name_label,
-            self.name_input,
-            self.grades_label,
-            self.grades_input,
-            self.allow_over_100,
-            self.use_extra_credit,
-            self.extra_points_label,
-            self.extra_credit_input,
-            self.calculate_button,
-        ]:
-
-            self.student_card.add_widget(
-                widget
-            )
+        self.update_grading_mode(
+            self.grading_mode_spinner,
+            "Standard",
+        )
 
         self.add_widget(
             self.student_card
         )
+
+
+    def update_grading_mode(
+        self,
+        spinner,
+        mode,
+    ):
+        """Switch the existing grade-entry area between Standard and Weighted."""
+
+        if not hasattr(self, "student_card"):
+            return
+
+        self.student_card.clear_widgets()
+
+        common_widgets = [
+            self.student_heading,
+            self.name_label,
+            self.name_input,
+            self.grading_mode_label,
+            self.grading_mode_spinner,
+        ]
+
+        for widget in common_widgets:
+            self.student_card.add_widget(widget)
+
+        if mode == "Weighted":
+            weighted_widgets = [
+                self.weighted_instructions,
+                self.tests_label,
+                self.tests_grades,
+                self.tests_weight_label,
+                self.tests_weight,
+                self.quizzes_label,
+                self.quizzes_grades,
+                self.quizzes_weight_label,
+                self.quizzes_weight,
+                self.homework_label,
+                self.homework_grades,
+                self.homework_weight_label,
+                self.homework_weight,
+                self.allow_over_100,
+            ]
+
+            for widget in weighted_widgets:
+                self.student_card.add_widget(widget)
+
+        else:
+            standard_widgets = [
+                self.grades_label,
+                self.grades_input,
+                self.allow_over_100,
+                self.use_extra_credit,
+                self.extra_points_label,
+                self.extra_credit_input,
+            ]
+
+            for widget in standard_widgets:
+                self.student_card.add_widget(widget)
+
+        self.student_card.add_widget(
+            self.calculate_button
+        )
+
+        # Clear stale calculated results when the grading method changes.
+        self.current_grades = []
+
+        if hasattr(self, "result_label"):
+            lang = self.lang()
+            self.result_label.text = (
+                f"{lang['average']}: --\n"
+                f"{lang['letter_grade']}: --"
+            )
+            self.feedback_label.text = ""
+
+        if hasattr(self, "path_results"):
+            self.path_results.text = (
+                self.lang()["path_placeholder"]
+            )
+
+        if hasattr(self, "current_card"):
+            self.apply_system_theme()
 
 
     def build_current_card(self):
@@ -1353,101 +1504,6 @@ class GradeCalculatorAndroid(BoxLayout):
         self.add_widget(
             self.current_card
         )
-
-    def build_weighted_card(self):
-    """Build the weighted grade categories section."""
-
-    self.weighted_card = Card()
-
-    self.weighted_heading = Label(
-        text="Weighted Grade Categories",
-        bold=True,
-        font_size="19sp",
-        size_hint_y=None,
-        height=dp(38),
-    )
-
-    self.weighted_instructions = Label(
-        text=(
-            "Enter grades for each category separated by commas "
-            "and assign each category a percentage weight."
-        ),
-        size_hint_y=None,
-        height=dp(65),
-        halign="center",
-        valign="middle",
-    )
-
-    self.weighted_instructions.bind(
-        width=lambda widget, width: setattr(
-            widget,
-            "text_size",
-            (width - dp(20), None),
-        )
-    )
-
-    self.tests_grades = self.create_input()
-    self.tests_grades.hint_text = "Tests grades: 85, 92, 78"
-
-    self.tests_weight = self.create_input(
-        input_filter="float"
-    )
-    self.tests_weight.hint_text = "Tests weight %"
-
-    self.quizzes_grades = self.create_input()
-    self.quizzes_grades.hint_text = "Quizzes grades: 90, 88"
-
-    self.quizzes_weight = self.create_input(
-        input_filter="float"
-    )
-    self.quizzes_weight.hint_text = "Quizzes weight %"
-
-    self.homework_grades = self.create_input()
-    self.homework_grades.hint_text = "Homework grades: 100, 95, 92"
-
-    self.homework_weight = self.create_input(
-        input_filter="float"
-    )
-    self.homework_weight.hint_text = "Homework weight %"
-
-    self.weighted_button = RoundedButton(
-        text="Calculate Weighted Grade"
-    )
-
-    self.weighted_button.bind(
-        on_press=self.calculate_weighted_grade
-    )
-
-    self.weighted_result = Label(
-        size_hint_y=None,
-        height=dp(90),
-        halign="center",
-        valign="middle",
-    )
-
-    self.weighted_result.bind(
-        width=lambda widget, width: setattr(
-            widget,
-            "text_size",
-            (width - dp(20), None),
-        )
-    )
-
-    for widget in [
-        self.weighted_heading,
-        self.weighted_instructions,
-        self.tests_grades,
-        self.tests_weight,
-        self.quizzes_grades,
-        self.quizzes_weight,
-        self.homework_grades,
-        self.homework_weight,
-        self.weighted_button,
-        self.weighted_result,
-    ]:
-        self.weighted_card.add_widget(widget)
-
-    self.add_widget(self.weighted_card)
 
 
     def build_goal_card(self):
@@ -1705,6 +1761,7 @@ class GradeCalculatorAndroid(BoxLayout):
         self.save_preferences()
 
 
+
     def apply_language(self):
 
         lang = self.lang()
@@ -1727,6 +1784,10 @@ class GradeCalculatorAndroid(BoxLayout):
 
         self.name_label.text = (
             lang["student_name"]
+        )
+
+        self.grading_mode_label.text = (
+            "How is this course graded?"
         )
 
         self.grades_label.text = (
@@ -1825,6 +1886,7 @@ class GradeCalculatorAndroid(BoxLayout):
             self.apply_system_theme()
 
 
+
     def apply_system_theme(self):
 
         theme = (
@@ -1841,7 +1903,6 @@ class GradeCalculatorAndroid(BoxLayout):
             self.header_card,
             self.student_card,
             self.current_card,
-            self.weighted_card,
             self.goal_card,
             self.path_card,
             self.about_card,
@@ -1855,12 +1916,13 @@ class GradeCalculatorAndroid(BoxLayout):
             self.title_label,
             self.student_heading,
             self.current_heading,
-            self.weighted_heading,
             self.goal_heading,
             self.path_heading,
             self.about_heading,
             self.result_label,
-            self.weighted_result,
+            self.tests_label,
+            self.quizzes_label,
+            self.homework_label,
         ]:
 
             label.color = (
@@ -1871,10 +1933,14 @@ class GradeCalculatorAndroid(BoxLayout):
             self.subtitle_label,
             self.language_label,
             self.name_label,
+            self.grading_mode_label,
             self.grades_label,
             self.extra_points_label,
-            self.feedback_label,
             self.weighted_instructions,
+            self.tests_weight_label,
+            self.quizzes_weight_label,
+            self.homework_weight_label,
+            self.feedback_label,
             self.target_label,
             self.remaining_label,
             self.goal_label,
@@ -1917,7 +1983,6 @@ class GradeCalculatorAndroid(BoxLayout):
 
         for button in [
             self.calculate_button,
-            self.weighted_button,
             self.goal_button,
             self.path_button,
         ]:
@@ -1963,15 +2028,17 @@ class GradeCalculatorAndroid(BoxLayout):
             theme["text"]
         )
 
-        self.language_spinner.background_normal = ""
-
-        self.language_spinner.background_color = (
-            theme["input"]
-        )
-
-        self.language_spinner.color = (
-            theme["text"]
-        )
+        for spinner in [
+            self.language_spinner,
+            self.grading_mode_spinner,
+        ]:
+            spinner.background_normal = ""
+            spinner.background_color = (
+                theme["input"]
+            )
+            spinner.color = (
+                theme["text"]
+            )
 
         self.update_extra_credit_field()
 
@@ -2144,6 +2211,7 @@ class GradeCalculatorAndroid(BoxLayout):
     # EXTRA CREDIT STATE
     # =====================================================
 
+
     def update_extra_credit_field(self):
 
         theme = (
@@ -2152,8 +2220,14 @@ class GradeCalculatorAndroid(BoxLayout):
             else LIGHT_THEME
         )
 
+        standard_mode = (
+            self.grading_mode_spinner.text
+            == "Standard"
+        )
+
         enabled = (
-            self.use_extra_credit.selected
+            standard_mode
+            and self.use_extra_credit.selected
         )
 
         self.extra_credit_input.disabled = (
@@ -2200,6 +2274,7 @@ class GradeCalculatorAndroid(BoxLayout):
     # CALCULATE CURRENT GRADE
     # =====================================================
 
+
     def calculate_grade(
         self,
         instance,
@@ -2221,18 +2296,113 @@ class GradeCalculatorAndroid(BoxLayout):
 
         try:
 
-            grades = (
-                self.parse_mobile_grades()
-            )
+            if (
+                self.grading_mode_spinner.text
+                == "Weighted"
+            ):
+                categories = []
 
-            extra_credit = (
-                self.get_extra_credit()
-            )
+                weighted_inputs = [
+                    (
+                        "Tests",
+                        self.tests_grades,
+                        self.tests_weight,
+                    ),
+                    (
+                        "Quizzes",
+                        self.quizzes_grades,
+                        self.quizzes_weight,
+                    ),
+                    (
+                        "Homework",
+                        self.homework_grades,
+                        self.homework_weight,
+                    ),
+                ]
 
-            average = calculate_average(
-                grades,
-                extra_credit,
-            )
+                for (
+                    category_name,
+                    grades_input,
+                    weight_input,
+                ) in weighted_inputs:
+
+                    grades_text = (
+                        grades_input.text.strip()
+                    )
+
+                    weight_text = (
+                        weight_input.text.strip()
+                    )
+
+                    if (
+                        not grades_text
+                        and not weight_text
+                    ):
+                        continue
+
+                    if (
+                        not grades_text
+                        or not weight_text
+                    ):
+                        raise ValueError(
+                            f"Enter both grades and a "
+                            f"weight for {category_name}."
+                        )
+
+                    grades = parse_grades(
+                        grades_text,
+                        allow_over_100=(
+                            self.allow_over_100.selected
+                        ),
+                    )
+
+                    try:
+                        weight = float(
+                            weight_text
+                        )
+                    except ValueError as exc:
+                        raise ValueError(
+                            f"{category_name} weight "
+                            f"must be a valid number."
+                        ) from exc
+
+                    if weight < 0:
+                        raise ValueError(
+                            "Category weights "
+                            "cannot be negative."
+                        )
+
+                    categories.append(
+                        (grades, weight)
+                    )
+
+                average = (
+                    calculate_weighted_average(
+                        categories
+                    )
+                )
+
+                # Grade Goal and Grade Path currently use
+                # individual standard grades, so do not
+                # feed them stale unweighted data.
+                self.current_grades = []
+
+            else:
+
+                grades = (
+                    self.parse_mobile_grades()
+                )
+
+                extra_credit = (
+                    self.get_extra_credit()
+                )
+
+                average = calculate_average(
+                    grades,
+                    extra_credit,
+                )
+
+                self.current_grades = grades
 
         except ValueError as error:
 
@@ -2241,8 +2411,6 @@ class GradeCalculatorAndroid(BoxLayout):
             )
 
             return
-
-        self.current_grades = grades
 
         self.result_label.text = (
             f"{lang['average']}: "
@@ -2258,80 +2426,6 @@ class GradeCalculatorAndroid(BoxLayout):
             )
         )
 
-
-    # =====================================================
-    # CALCULATE WEIGHTED GRADE
-    # =====================================================
-
-    def calculate_weighted_grade(self, instance):
-        """Calculate the course average using weighted categories."""
-
-        try:
-            categories = []
-
-            category_inputs = [
-                (self.tests_grades, self.tests_weight),
-                (self.quizzes_grades, self.quizzes_weight),
-                (self.homework_grades, self.homework_weight),
-            ]
-
-            for grades_input, weight_input in category_inputs:
-                grades_text = grades_input.text.strip()
-                weight_text = weight_input.text.strip()
-
-                # Ignore a category if both fields are blank.
-                if not grades_text and not weight_text:
-                    continue
-
-                # Require both grades and weight when a category is used.
-                if not grades_text or not weight_text:
-                    raise ValueError(
-                        "Enter both grades and a weight for each category."
-                    )
-
-                grades = parse_grades(
-                    grades_text,
-                    allow_over_100=self.allow_over_100.selected,
-                )
-
-                weight = float(weight_text)
-
-                if weight < 0:
-                    raise ValueError(
-                        "Category weights cannot be negative."
-                    )
-
-                categories.append(
-                    (grades, weight)
-                )
-
-            average = calculate_weighted_average(
-                categories
-            )
-
-        except ValueError as error:
-            self.show_message(str(error))
-            return
-
-        self.current_grades = []
-
-        self.weighted_result.text = (
-            f"Weighted Average: {average:.2f}%\n"
-            f"Letter Grade: {letter_grade(average)}"
-        )
-
-        self.result_label.text = (
-            f"Weighted Average: {average:.2f}%\n"
-            f"Letter Grade: {letter_grade(average)}"
-        )
-
-        self.feedback_label.text = (
-            translated_feedback(
-                average,
-                self.lang(),
-            )
-        )
-    
 
     # =====================================================
     # GRADE GOAL
@@ -2572,6 +2666,7 @@ class GradeCalculatorAndroid(BoxLayout):
     # RESET
     # =====================================================
 
+
     def clear(
         self,
         instance,
@@ -2583,12 +2678,6 @@ class GradeCalculatorAndroid(BoxLayout):
 
         self.grades_input.text = ""
 
-        self.target_input.text = ""
-
-        self.remaining_input.text = ""
-
-        self.extra_credit_input.text = "0"
-
         self.tests_grades.text = ""
         self.tests_weight.text = ""
 
@@ -2598,7 +2687,11 @@ class GradeCalculatorAndroid(BoxLayout):
         self.homework_grades.text = ""
         self.homework_weight.text = ""
 
-        self.weighted_result.text = ""
+        self.target_input.text = ""
+
+        self.remaining_input.text = ""
+
+        self.extra_credit_input.text = "0"
 
         self.allow_over_100.set_selected(
             False
@@ -2606,6 +2699,10 @@ class GradeCalculatorAndroid(BoxLayout):
 
         self.use_extra_credit.set_selected(
             False
+        )
+
+        self.grading_mode_spinner.text = (
+            "Standard"
         )
 
         self.current_grades = []
@@ -2621,6 +2718,11 @@ class GradeCalculatorAndroid(BoxLayout):
 
         self.path_results.text = (
             lang["path_placeholder"]
+        )
+
+        self.update_grading_mode(
+            self.grading_mode_spinner,
+            "Standard",
         )
 
         self.apply_system_theme()
