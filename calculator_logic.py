@@ -16,6 +16,8 @@ def calculate_average(
 
     return (sum(grades) + extra_credit_points) / len(grades)
 
+
+
 def calculate_weighted_average(
     categories: list[tuple[list[float], float]],
 ) -> float:
@@ -52,7 +54,6 @@ def calculate_weighted_average(
         )
 
     return weighted_total
-
 
 def letter_grade(average: float) -> str:
     """Convert a numerical average into a letter grade."""
