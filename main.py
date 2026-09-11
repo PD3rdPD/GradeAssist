@@ -28,6 +28,8 @@ from calculator_logic import (
     parse_grades,
 )
 
+from account_manager import AccountManager
+
 APP_NAME = "Grade Assist"
 APP_VERSION = "1.0.0"
 TAGLINE = "Plan. Calculate. Improve."
@@ -1114,6 +1116,122 @@ class SelectableButton(Button):
 # =========================================================
 # MAIN APP INTERFACE
 # =========================================================
+
+class AccountView(BoxLayout):
+    """Login and account creation screen."""
+
+    def __init__(self, app, **kwargs):
+        super().__init__(
+            orientation="vertical",
+            spacing=dp(15),
+            padding=dp(25),
+            **kwargs,
+        )
+
+        self.app = app
+
+        self.add_widget(
+            Label(
+                text=APP_NAME,
+                font_size="28sp",
+                bold=True,
+                size_hint_y=None,
+                height=dp(70),
+            )
+        )
+
+        self.add_widget(
+            Label(
+                text="Sign in to continue",
+                font_size="18sp",
+                size_hint_y=None,
+                height=dp(45),
+            )
+        )
+
+        self.username_input = TextInput(
+            hint_text="Username",
+            multiline=False,
+            size_hint_y=None,
+            height=dp(50),
+        )
+
+        self.add_widget(self.username_input)
+
+        self.password_input = TextInput(
+            hint_text="Password",
+            password=True,
+            multiline=False,
+            size_hint_y=None,
+            height=dp(50),
+        )
+
+        self.add_widget(self.password_input)
+
+        self.message_label = Label(
+            text="",
+            size_hint_y=None,
+            height=dp(55),
+        )
+
+        self.add_widget(self.message_label)
+
+        login_button = RoundedButton(
+            text="Log In"
+        )
+
+        login_button.bind(
+            on_press=self.login
+        )
+
+        self.add_widget(login_button)
+
+        create_button = RoundedButton(
+            text="Create Account"
+        )
+
+        create_button.bind(
+            on_press=self.create_account
+        )
+
+        self.add_widget(create_button)
+
+    def login(self, instance):
+        username = self.username_input.text
+        password = self.password_input.text
+
+        if self.app.account_manager.authenticate(
+            username,
+            password,
+        ):
+            self.message_label.text = ""
+            self.app.open_calculator(
+                username.strip().lower()
+            )
+        else:
+            self.message_label.text = (
+                "Invalid username or password."
+            )
+
+    def create_account(self, instance):
+        username = self.username_input.text
+        password = self.password_input.text
+
+        try:
+            username = (
+                self.app.account_manager.create_account(
+                    username,
+                    password,
+                )
+            )
+
+        except ValueError as error:
+            self.message_label.text = str(error)
+            return
+
+        self.message_label.text = ""
+        self.app.open_calculator(username)
+
 
 class GradeCalculatorAndroid(BoxLayout):
     """Main Android calculator interface."""
@@ -2674,8 +2792,6 @@ class GradeCalculatorAndroid(BoxLayout):
 
         lang = self.lang()
 
-        self.name_input.text = ""
-
         self.grades_input.text = ""
 
         self.tests_grades.text = ""
@@ -2828,14 +2944,100 @@ class GradeCalculatorAndroid(BoxLayout):
 # =========================================================
 
 class GradeCalculatorAndroidApp(App):
-    """Android Student Grade Calculator."""
+    """Grade Assist application with local user accounts."""
 
     def build(self):
-
         self.title = APP_NAME
 
-        layout = (
+        self.container = BoxLayout(
+            orientation="vertical"
+        )
+
+        accounts_path = (
+            Path(self.user_data_dir)
+            / "accounts.json"
+        )
+
+        self.account_manager = AccountManager(
+            accounts_path
+        )
+
+        self.current_username = None
+        self.calculator = None
+
+        self.show_login()
+
+        return self.container
+
+    def show_login(self):
+        self.current_username = None
+        self.calculator = None
+
+        self.container.clear_widgets()
+
+        self.login_view = AccountView(self)
+
+        self.container.add_widget(
+            self.login_view
+        )
+
+    def open_calculator(self, username):
+        self.current_username = username
+
+        self.container.clear_widgets()
+
+        account_bar = BoxLayout(
+            orientation="horizontal",
+            spacing=dp(10),
+            padding=dp(10),
+            size_hint_y=None,
+            height=dp(65),
+        )
+
+        signed_in_label = Label(
+            text=f"Signed in as: {username}"
+        )
+
+        logout_button = RoundedButton(
+            text="Log Out",
+            size_hint_x=0.35,
+        )
+
+        logout_button.bind(
+            on_press=self.logout
+        )
+
+        account_bar.add_widget(
+            signed_in_label
+        )
+
+        account_bar.add_widget(
+            logout_button
+        )
+
+        self.container.add_widget(
+            account_bar
+        )
+
+        self.calculator = (
             GradeCalculatorAndroid()
+        )
+
+        profile = (
+            self.account_manager.get_profile(
+                username
+            )
+        )
+
+        self.calculator.name_input.text = (
+            profile.get(
+                "student_name",
+                "",
+            )
+        )
+
+        self.calculator.name_input.bind(
+            text=self.save_student_name
         )
 
         scroll = ScrollView(
@@ -2845,10 +3047,29 @@ class GradeCalculatorAndroidApp(App):
         )
 
         scroll.add_widget(
-            layout
+            self.calculator
         )
 
-        return scroll
+        self.container.add_widget(scroll)
+
+    def save_student_name(
+        self,
+        instance,
+        value,
+    ):
+        if self.current_username is None:
+            return
+
+        try:
+            self.account_manager.save_profile(
+                self.current_username,
+                student_name=value,
+            )
+        except ValueError:
+            pass
+
+    def logout(self, instance):
+        self.show_login()
 
 
 if __name__ == "__main__":
